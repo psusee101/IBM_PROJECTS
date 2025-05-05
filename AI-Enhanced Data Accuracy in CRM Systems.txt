@@ -1,0 +1,211 @@
+💳 Anomaly Detection in Financial Transactions
+(MEAN Stack – No Python, JS-based AI Only)
+
+🎯 Objective:
+Build an AI-driven system using JavaScript libraries in the MEAN stack to:
+
+Detect anomalous or fraudulent transactions
+
+Flag unusual patterns (e.g., unexpected amounts, time, location)
+
+Provide a dashboard for human review and feedback
+
+🧱 Technology Stack
+Layer	Tool / Library	Purpose
+Database	MongoDB	Store transaction logs and anomaly flags
+Backend	Node.js + Express	API layer and anomaly detection logic
+AI Tools	ml.js, tfjs, custom JS logic	Outlier detection models in JavaScript
+Frontend	Angular	Interface for monitoring and investigation
+
+⚙️ Key Features
+✅ Real-Time Anomaly Detection
+Use techniques like:
+
+Statistical rules (mean + standard deviation)
+
+Custom scoring
+
+JS ML models (ml.js, tfjs) for advanced patterns
+
+✅ Transaction Scoring System
+Assign a risk score (0–100%) to every transaction.
+
+✅ Admin Review Dashboard
+Display flagged transactions with reason (amount too high, location mismatch, etc.)
+
+✅ Learning Loop
+Optional: Track false positives to improve thresholds.
+
+🔄 System Workflow
+Transaction Input (Angular Form or API)
+
+Backend Processing
+
+Normalize and score transaction
+
+Check for anomalies
+
+MongoDB Storage
+
+Save transaction + anomaly flag + risk score
+
+Angular Dashboard
+
+View suspicious transactions, filter by score or type
+
+🧠 Anomaly Detection Techniques (JS Only)
+A. Rule-Based Thresholds (Simple)
+E.g., Amount > 10x average user amount → flag
+
+B. Z-Score / Statistical Outlier Detection
+js
+Copy
+Edit
+function isAnomaly(amount, avg, std) {
+  const z = Math.abs((amount - avg) / std);
+  return z > 3;
+}
+C. Isolation Forest (Simplified logic in JS)
+Simulate with custom "weirdness score" logic:
+
+js
+Copy
+Edit
+function computeAnomalyScore(transaction) {
+  let score = 0;
+  if (transaction.amount > 10000) score += 40;
+  if (transaction.location !== transaction.expectedLocation) score += 30;
+  if (transaction.time > 22 || transaction.time < 5) score += 20;
+  return score; // out of 100
+}
+📁 Project Structure
+pgsql
+Copy
+Edit
+transaction-anomaly/
+├── backend/
+│   ├── server.js
+│   ├── routes/
+│   │   └── transactionRoutes.js
+│   ├── utils/
+│   │   └── anomalyDetection.js
+├── frontend/
+│   └── src/app/
+│       ├── components/
+│       └── services/
+├── models/
+│   └── Transaction.js
+├── database/
+│   └── mongoConnection.js
+📄 MongoDB Schema (models/Transaction.js)
+js
+Copy
+Edit
+const mongoose = require('mongoose');
+
+const transactionSchema = new mongoose.Schema({
+  userId: String,
+  amount: Number,
+  location: String,
+  timestamp: Date,
+  isAnomalous: Boolean,
+  riskScore: Number,
+  anomalyReason: String
+});
+
+module.exports = mongoose.model('Transaction', transactionSchema);
+🧠 Backend Logic: anomalyDetection.js
+js
+Copy
+Edit
+function detectAnomaly(transaction, userStats) {
+  const { avg, stdDev, expectedLocation } = userStats;
+  const zScore = Math.abs((transaction.amount - avg) / stdDev);
+
+  let score = 0;
+  let reason = [];
+
+  if (zScore > 3) {
+    score += 50;
+    reason.push('High z-score');
+  }
+  if (transaction.location !== expectedLocation) {
+    score += 30;
+    reason.push('Location mismatch');
+  }
+  const hour = new Date(transaction.timestamp).getHours();
+  if (hour < 5 || hour > 22) {
+    score += 20;
+    reason.push('Unusual time');
+  }
+
+  return {
+    isAnomalous: score >= 50,
+    riskScore: score,
+    anomalyReason: reason.join(', ')
+  };
+}
+
+module.exports = detectAnomaly;
+🧾 Route: transactionRoutes.js
+js
+Copy
+Edit
+const express = require('express');
+const router = express.Router();
+const Transaction = require('../models/Transaction');
+const detectAnomaly = require('../utils/anomalyDetection');
+
+router.post('/new', async (req, res) => {
+  const txn = req.body;
+
+  // Simulated user stats — normally you'd query these
+  const userStats = {
+    avg: 1000,
+    stdDev: 300,
+    expectedLocation: 'New York'
+  };
+
+  const result = detectAnomaly(txn, userStats);
+
+  const newTxn = new Transaction({
+    ...txn,
+    ...result
+  });
+
+  await newTxn.save();
+  res.json({ message: 'Transaction analyzed', result });
+});
+🖥️ Angular Frontend
+Components:
+TransactionFormComponent: Submit new transactions
+
+AnomalyListComponent: List and filter flagged transactions
+
+Example Angular Table View
+html
+Copy
+Edit
+<tr *ngFor="let txn of transactions">
+  <td>{{ txn.userId }}</td>
+  <td>{{ txn.amount }}</td>
+  <td [ngClass]="{'text-danger': txn.isAnomalous}">
+    {{ txn.riskScore }}%
+  </td>
+  <td>{{ txn.anomalyReason }}</td>
+</tr>
+📊 Example Scenario
+User U123 spends $11,000 at 2:00 AM in Tokyo.
+Their usual spend is ~$800 in New York during the day.
+JS-based logic assigns a risk score of 85.
+Flagged as anomalous.
+Admin reviews and confirms as fraud.
+
+✅ Benefits
+Fully JavaScript-based (no Python, runs in Node.js)
+
+Works with real-time transaction streams
+
+Easy to adapt rules and scoring
+
+Can be trained on historical user data with ml.js or tfjs if needed

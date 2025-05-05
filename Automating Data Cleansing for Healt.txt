@@ -1,0 +1,185 @@
+Automating Data Cleansing for Healthcare Records with NLP
+(MEAN Stack – Angular + Node.js + MongoDB + JS NLP)
+
+🎯 Project Goal:
+To automate the data cleansing process for Electronic Health Records (EHRs) using Natural Language Processing (NLP) in JavaScript. This ensures that medical data is:
+
+Consistent (e.g., standard terminology)
+
+Accurate (typos corrected)
+
+Complete (detect and fix missing fields)
+
+Structured for use in AI models and analytics
+
+🧱 Tech Stack Overview
+Layer	Tool / Library	Role
+Frontend	Angular	UI for EHR data entry and review
+Backend	Node.js + Express	API + data cleansing logic
+Database	MongoDB	Store raw and cleaned EHRs
+NLP Tools	compromise, string-similarity, lodash	Term expansion, typo fixing, text normalization
+
+⚙️ Core Features
+Medical Abbreviation Expansion
+E.g., “HTN” → “Hypertension”
+
+Typo Correction
+Auto-correct common typos using fuzzy matching
+
+Text Normalization
+Standardizes format (e.g., casing, units)
+
+Review Dashboard
+UI shows “before” and “after” cleansing
+
+🔄 Workflow
+User submits raw medical note
+
+Node.js backend cleans it using NLP libraries
+
+Cleansed note + correction log saved to MongoDB
+
+Angular frontend shows original vs cleaned text
+
+🗃️ MongoDB Schema (models/PatientRecord.js)
+js
+Copy
+Edit
+const mongoose = require('mongoose');
+
+const recordSchema = new mongoose.Schema({
+  patientId: String,
+  originalText: String,
+  cleanedText: String,
+  corrections: [String],
+  status: { type: String, default: 'pending' }
+});
+
+module.exports = mongoose.model('PatientRecord', recordSchema);
+🧠 Backend NLP Cleaning Logic
+utils/cleanEHR.js
+js
+Copy
+Edit
+const nlp = require('compromise');
+const stringSimilarity = require('string-similarity');
+
+const abbreviationMap = {
+  'htn': 'Hypertension',
+  'dm': 'Diabetes Mellitus',
+  'bp': 'Blood Pressure',
+  'copd': 'Chronic Obstructive Pulmonary Disease'
+};
+
+const typoCorrections = ['diabtes', 'hpyertension', 'caridac']; // Example typos
+
+function cleanMedicalText(text) {
+  let corrections = [];
+  let cleaned = text.toLowerCase();
+
+  // Abbreviation Expansion
+  Object.entries(abbreviationMap).forEach(([abbr, full]) => {
+    const regex = new RegExp(`\\b${abbr}\\b`, 'gi');
+    if (regex.test(cleaned)) {
+      cleaned = cleaned.replace(regex, full);
+      corrections.push(`Expanded "${abbr}" to "${full}"`);
+    }
+  });
+
+  // Typo Correction (simple fuzzy match)
+  typoCorrections.forEach(typo => {
+    const match = stringSimilarity.findBestMatch(typo, Object.values(abbreviationMap));
+    if (cleaned.includes(typo)) {
+      cleaned = cleaned.replace(new RegExp(typo, 'gi'), match.bestMatch.target);
+      corrections.push(`Corrected "${typo}" to "${match.bestMatch.target}"`);
+    }
+  });
+
+  // Title Case
+  cleaned = nlp(cleaned).toTitleCase().text();
+
+  return { cleanedText: cleaned, corrections };
+}
+
+module.exports = cleanMedicalText;
+🚀 API Route to Submit Record
+routes/records.js
+js
+Copy
+Edit
+const express = require('express');
+const router = express.Router();
+const PatientRecord = require('../models/PatientRecord');
+const cleanMedicalText = require('../utils/cleanEHR');
+
+router.post('/submit', async (req, res) => {
+  const { patientId, originalText } = req.body;
+  const { cleanedText, corrections } = cleanMedicalText(originalText);
+
+  const record = new PatientRecord({
+    patientId,
+    originalText,
+    cleanedText,
+    corrections,
+    status: 'pending'
+  });
+
+  await record.save();
+  res.json({ message: 'Record cleaned and stored', record });
+});
+🖥️ Angular Frontend Highlights
+Components
+SubmitFormComponent: Enter raw EHR data
+
+ReviewComponent: Show original vs cleaned text and suggested corrections
+
+Sample HTML View
+html
+Copy
+Edit
+<h2>Review Cleaned Record</h2>
+<p><strong>Original:</strong> {{ record.originalText }}</p>
+<p><strong>Cleaned:</strong> {{ record.cleanedText }}</p>
+<ul>
+  <li *ngFor="let note of record.corrections">{{ note }}</li>
+</ul>
+📊 Sample Input/Output
+Input:
+
+nginx
+Copy
+Edit
+pt has htn, diabtes, and copd hx. bp 145/90
+Cleaned Output:
+
+mathematica
+Copy
+Edit
+Pt Has Hypertension, Diabetes Mellitus, And Chronic Obstructive Pulmonary Disease Hx. Blood Pressure 145/90
+Corrections:
+
+Expanded “htn” → “Hypertension”
+
+Corrected “diabtes” → “Diabetes Mellitus”
+
+Expanded “bp” → “Blood Pressure”
+
+Expanded “copd” → “Chronic Obstructive Pulmonary Disease”
+
+✅ Benefits
+Improved data consistency in EHR systems
+
+Reduces manual cleansing effort for clinicians
+
+Prepares records for AI/ML diagnosis models
+
+Entirely in JavaScript (no Python/ML server needed)
+
+🛠️ Possible Enhancements
+CSV Upload + Batch Processing
+
+Add custom medical dictionary
+
+Show confidence scores for corrections
+
+Add review history for audit logs

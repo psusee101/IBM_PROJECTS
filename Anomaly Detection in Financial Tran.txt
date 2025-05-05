@@ -1,0 +1,182 @@
+Anomaly Detection in Financial Transactions
+(MEAN Stack – JS-based Anomaly Detection Algorithms)
+
+🎯 Objective:
+The goal is to implement anomaly detection algorithms for financial transaction data to identify fraudulent or suspicious activities. The project focuses on:
+
+Transaction pattern analysis
+
+Outlier detection using statistical techniques
+
+Automated alert generation for unusual activities
+
+Data integrity and security enhancement
+
+🧱 Technology Stack
+Layer	Tool / Library	Purpose
+Frontend	Angular	UI for real-time transaction review and anomaly alerts
+Backend	Node.js + Express	API for anomaly detection logic and transaction handling
+Database	MongoDB	Store raw transaction data, anomaly alerts, and logs
+Libraries	simple-statistics, ml.js	Statistical outlier detection, anomaly scoring
+
+⚙️ Key Features
+Transaction Validation
+
+Ensure each transaction adheres to expected ranges or patterns.
+
+Anomaly Scoring
+
+Use statistical models like Z-score and Isolation Forest for anomaly scoring.
+
+Real-Time Alerts
+
+Flag suspicious transactions for immediate review.
+
+Visualization
+
+Graphs of transaction data and flagged anomalies on the dashboard.
+
+🔄 System Workflow
+Transaction Submitted via an API request.
+
+Node.js Backend performs anomaly detection on the transaction.
+
+Anomaly Detected if transaction values differ significantly from typical patterns (outlier).
+
+Alert Generated and stored in MongoDB.
+
+Angular Frontend shows a live view of flagged transactions and alerts.
+
+🗃️ MongoDB Schema (models/Transaction.js)
+js
+Copy
+Edit
+const mongoose = require('mongoose');
+
+const transactionSchema = new mongoose.Schema({
+  transactionId: String,
+  amount: Number,
+  merchant: String,
+  customerId: String,
+  timestamp: Date,
+  isAnomaly: { type: Boolean, default: false },
+  anomalyScore: { type: Number, default: 0 },
+  status: { type: String, default: 'pending' } // e.g., pending, flagged, reviewed
+});
+
+module.exports = mongoose.model('Transaction', transactionSchema);
+🧠 Anomaly Detection Logic (Backend)
+utils/anomalyDetection.js
+js
+Copy
+Edit
+const ss = require('simple-statistics');
+
+function calculateZScore(transaction, historicalTransactions) {
+  const amounts = historicalTransactions.map(t => t.amount);
+  const mean = ss.mean(amounts);
+  const stdDev = ss.standardDeviation(amounts);
+  const zScore = (transaction.amount - mean) / stdDev;
+  return zScore;
+}
+
+function detectAnomaly(transaction, historicalTransactions) {
+  const zScore = calculateZScore(transaction, historicalTransactions);
+  const isAnomaly = Math.abs(zScore) > 3; // Flag transactions outside 3 std deviations
+  return { isAnomaly, zScore };
+}
+
+module.exports = detectAnomaly;
+API Route for Handling Transactions (routes/transactions.js)
+js
+Copy
+Edit
+const express = require('express');
+const router = express.Router();
+const Transaction = require('../models/Transaction');
+const detectAnomaly = require('../utils/anomalyDetection');
+
+router.post('/submit', async (req, res) => {
+  const { transactionId, amount, merchant, customerId, timestamp } = req.body;
+  const historicalTransactions = await Transaction.find({ customerId }).sort({ timestamp: -1 }).limit(100);
+  
+  const newTransaction = { transactionId, amount, merchant, customerId, timestamp };
+  const { isAnomaly, zScore } = detectAnomaly(newTransaction, historicalTransactions);
+
+  const transaction = new Transaction({
+    transactionId,
+    amount,
+    merchant,
+    customerId,
+    timestamp,
+    isAnomaly,
+    anomalyScore: zScore
+  });
+
+  await transaction.save();
+  
+  res.json({ message: 'Transaction submitted', isAnomaly, anomalyScore: zScore });
+});
+📊 Angular Frontend (Key Components)
+Components
+TransactionFormComponent: For submitting transaction details.
+
+AnomalyAlertComponent: Display flagged anomalies.
+
+TransactionListComponent: View list of transactions with anomaly status.
+
+Sample HTML for Anomaly Alerts
+html
+Copy
+Edit
+<div *ngIf="transaction.isAnomaly" class="alert alert-danger">
+  Suspicious Transaction: {{ transaction.transactionId }} has been flagged due to abnormal activity.
+</div>
+
+<div *ngIf="!transaction.isAnomaly" class="alert alert-success">
+  Transaction {{ transaction.transactionId }} is normal.
+</div>
+🧪 Example Dataset and Output
+Input:
+
+json
+Copy
+Edit
+{
+  "transactionId": "TX12345",
+  "amount": 5000,
+  "merchant": "SuperMart",
+  "customerId": "CUST123",
+  "timestamp": "2025-05-06T12:00:00"
+}
+Output:
+
+json
+Copy
+Edit
+{
+  "message": "Transaction submitted",
+  "isAnomaly": true,
+  "anomalyScore": 4.5 // Significantly higher than average transaction amount
+}
+Anomaly Reason:
+
+Z-Score: 4.5 (above the 3 standard deviation threshold)
+
+✅ Benefits
+Automates Fraud Detection in real-time transactions
+
+Reduces Manual Oversight by flagging suspicious activities automatically
+
+Scalable solution for large datasets of transaction records
+
+Fully JavaScript-based solution using the MEAN stack, avoiding the need for Python-based systems
+
+🔧 Possible Enhancements
+Isolation Forest Algorithm: Add advanced anomaly detection algorithms using JavaScript-based ML libraries like ml.js.
+
+Dashboard Visualization: Add charts and graphs in the Angular frontend to show flagged transactions, daily transaction statistics, and anomaly trends.
+
+Batch Anomaly Detection: Process batches of transactions and generate periodic reports for review.
+
+Machine Learning Integration: Integrate TensorFlow.js or other JavaScript ML frameworks for more advanced fraud detection.

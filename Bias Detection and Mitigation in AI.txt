@@ -1,0 +1,165 @@
+Bias Detection and Mitigation in AI Training Data
+(MEAN Stack – JS-based auditing, No Python)
+
+🎯 Objective:
+Detect and reduce bias in training data used for AI models (e.g., customer feedback, hiring data, loan applications) by:
+
+Identifying over/underrepresented groups
+
+Analyzing patterns of imbalance (e.g., gender, ethnicity, region)
+
+Providing tools to review and rebalance datasets before training
+
+🧱 Technology Stack
+Layer	Tool / Library	Purpose
+Database	MongoDB	Store raw datasets + bias reports
+Backend	Node.js + Express	Bias analysis logic, report generation
+Libraries	simple-statistics, ml.js, lodash	Group distribution stats, entropy, fairness checks
+Frontend	Angular	Upload, visualize, and adjust datasets
+
+⚙️ Key Features
+✅ Dataset Profiling
+Analyze class balance in fields like gender, race, age, location
+
+Visual distribution charts (frontend)
+
+✅ Bias Metrics
+Class imbalance ratios
+
+Entropy, skew, and variance
+
+✅ Mitigation Options
+Downsample overrepresented groups
+
+Duplicate underrepresented samples
+
+Export rebalanced dataset
+
+✅ Interactive Review
+Let users preview before/after distributions
+
+🗃️ MongoDB Schema (models/TrainingRecord.js)
+js
+Copy
+Edit
+const mongoose = require('mongoose');
+
+const trainingRecordSchema = new mongoose.Schema({
+  data: Object, // flexible key-value pair
+  biasAnalysis: {
+    field: String,
+    imbalanceScore: Number,
+    distribution: Object,
+    suggestedAction: String
+  }
+});
+
+module.exports = mongoose.model('TrainingRecord', trainingRecordSchema);
+🧠 Backend Logic (Bias Detection)
+utils/biasAnalysis.js
+js
+Copy
+Edit
+const _ = require('lodash');
+const ss = require('simple-statistics');
+
+// Detect imbalance in a given field (e.g., gender)
+function analyzeBias(records, field) {
+  const groupCounts = _.countBy(records.map(r => r[field]));
+  const total = records.length;
+  const distribution = {};
+
+  Object.entries(groupCounts).forEach(([group, count]) => {
+    distribution[group] = +(count / total).toFixed(3);
+  });
+
+  const entropy = ss.entropy(Object.values(distribution));
+  const imbalanceScore = +(1 - entropy).toFixed(3); // 0 = balanced, 1 = skewed
+
+  let suggestion = 'Balanced';
+  if (imbalanceScore > 0.4) {
+    suggestion = 'Consider downsampling dominant or duplicating minor class';
+  }
+
+  return { field, imbalanceScore, distribution, suggestedAction: suggestion };
+}
+
+module.exports = analyzeBias;
+🧾 API Endpoint: biasRoutes.js
+js
+Copy
+Edit
+const express = require('express');
+const router = express.Router();
+const analyzeBias = require('../utils/biasAnalysis');
+
+router.post('/analyze', (req, res) => {
+  const { dataset, field } = req.body;
+
+  if (!dataset || !field) {
+    return res.status(400).json({ error: 'Missing dataset or field' });
+  }
+
+  const result = analyzeBias(dataset, field);
+  res.json(result);
+});
+📈 Angular Frontend
+Components
+UploadDatasetComponent: Load CSV/JSON
+
+BiasReportComponent: View analysis (charts, suggestions)
+
+MitigationComponent: Apply balancing (optional)
+
+Sample HTML
+html
+Copy
+Edit
+<div>
+  <h3>Bias Analysis for Field: {{ field }}</h3>
+  <p>Imbalance Score: {{ result.imbalanceScore }}</p>
+  <p>Suggestion: {{ result.suggestedAction }}</p>
+
+  <canvas baseChart
+    [datasets]="[{ data: chartData, label: field }]"
+    [labels]="chartLabels"
+    chartType="pie">
+  </canvas>
+</div>
+🧪 Example Dataset
+json
+Copy
+Edit
+[
+  { gender: "male", age: 35 },
+  { gender: "male", age: 42 },
+  { gender: "female", age: 37 },
+  { gender: "male", age: 29 },
+  { gender: "male", age: 41 }
+]
+Bias Result (field: gender):
+
+Male: 80%
+
+Female: 20%
+
+Imbalance Score: 0.28
+
+Suggestion: Consider duplicating female records
+
+✅ Benefits
+Easily detects dataset bias before AI training
+
+No Python required – fully JS-based
+
+Helps promote fairness and equity in model decisions
+
+Suitable for HR, finance, healthcare, and education datasets
+
+🔧 Optional Extensions
+Add TensorFlow.js model trainer with bias-aware sampling
+
+Export cleaned dataset as JSON/CSV
+
+Add batch analysis for multiple fields
+

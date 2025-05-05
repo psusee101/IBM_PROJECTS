@@ -1,0 +1,181 @@
+ Enhancing Data Quality in Predictive Maintenance Systems
+(MEAN Stack – JS-based Data Validation & ML)
+
+🎯 Objective:
+Improve the quality of sensor data used in predictive maintenance for industrial equipment by:
+
+Cleaning noisy or missing sensor readings
+
+Validating data ranges & units
+
+Identifying faulty patterns using JavaScript-based ML
+
+Ensuring accurate maintenance predictions
+
+🧱 Technology Stack
+Layer	Tool / Library	Purpose
+Database	MongoDB	Store raw and validated sensor data
+Backend	Node.js + Express	API logic, sensor data validation
+ML / AI	ml.js, custom logic, simple-statistics	Data smoothing, anomaly detection, outlier filtering
+Frontend	Angular	Real-time visualization and review dashboard
+
+⚙️ Core Features
+✅ Sensor Data Validation
+Ensure sensor values fall within expected ranges (e.g., temperature between 0–120°C)
+
+Detect and mark missing/null data
+
+✅ Noise Filtering
+Use smoothing algorithms (moving average or Kalman filter approximation) to reduce data spikes
+
+✅ Outlier Detection
+Apply statistical models (like z-score or IQR) in JavaScript to identify abnormal readings
+
+✅ Admin Interface
+Display raw vs. cleaned data
+
+Show maintenance predictions based on clean data
+
+🔄 System Workflow
+Sensor Data Submitted (via API or simulated stream)
+
+Node.js Backend
+
+Cleans, validates, and flags errors
+
+Stores both raw and corrected entries
+
+MongoDB
+
+Holds historical and current sensor data
+
+Angular Dashboard
+
+Displays real-time sensor graphs and prediction readiness
+
+🗃️ MongoDB Schema (models/SensorData.js)
+js
+Copy
+Edit
+const mongoose = require('mongoose');
+
+const sensorSchema = new mongoose.Schema({
+  deviceId: String,
+  timestamp: Date,
+  rawTemperature: Number,
+  cleanedTemperature: Number,
+  isOutlier: Boolean,
+  isMissing: Boolean,
+  status: { type: String, default: 'ok' } // e.g., ok, warning, invalid
+});
+
+module.exports = mongoose.model('SensorData', sensorSchema);
+🧠 Backend Cleaning Logic
+utils/validateSensorData.js
+js
+Copy
+Edit
+const ss = require('simple-statistics');
+
+function validateSensorData(data, previousValues = []) {
+  const cleaned = { ...data };
+  let status = 'ok';
+  let isOutlier = false;
+
+  if (data.rawTemperature == null) {
+    cleaned.cleanedTemperature = null;
+    status = 'missing';
+    cleaned.isMissing = true;
+    return { ...cleaned, status, isOutlier };
+  }
+
+  // Range check
+  if (data.rawTemperature < -40 || data.rawTemperature > 150) {
+    status = 'invalid';
+  }
+
+  // Outlier check using z-score
+  if (previousValues.length > 10) {
+    const z = ss.zScore(data.rawTemperature, previousValues);
+    if (Math.abs(z) > 2.5) {
+      isOutlier = true;
+      status = 'warning';
+    }
+  }
+
+  // Moving average smoothing
+  const smoothed = ss.mean([...previousValues.slice(-4), data.rawTemperature]);
+
+  cleaned.cleanedTemperature = smoothed;
+  cleaned.isMissing = false;
+
+  return { ...cleaned, status, isOutlier };
+}
+
+module.exports = validateSensorData;
+🧾 Route: sensorRoutes.js
+js
+Copy
+Edit
+const express = require('express');
+const router = express.Router();
+const SensorData = require('../models/SensorData');
+const validateSensorData = require('../utils/validateSensorData');
+
+router.post('/submit', async (req, res) => {
+  const { deviceId, rawTemperature, timestamp } = req.body;
+  const recentData = await SensorData.find({ deviceId }).sort({ timestamp: -1 }).limit(20);
+  const recentTemps = recentData.map(r => r.rawTemperature).filter(n => n != null);
+
+  const result = validateSensorData({ deviceId, rawTemperature, timestamp }, recentTemps);
+  const entry = new SensorData(result);
+
+  await entry.save();
+  res.json({ message: 'Sensor data processed', result });
+});
+📊 Angular Frontend (Key Components)
+Components:
+SensorGraphComponent: Real-time chart (raw vs. cleaned)
+
+SensorStatusComponent: Show warnings/errors
+
+PredictionReadyComponent: Show if the data is clean enough for ML prediction
+
+Sample Display:
+html
+Copy
+Edit
+<div *ngIf="data.status === 'warning'" class="alert alert-warning">
+  Warning: Outlier detected!
+</div>
+
+<canvas baseChart
+        [datasets]="chartData"
+        [labels]="labels"
+        chartType="line">
+</canvas>
+📈 Example Use Case
+Sensor reads 150.2°C suddenly, while previous values were 60–70°C.
+JS logic flags it as:
+
+❌ Outlier (z-score > 3)
+
+✅ Smoothed to ~71°C
+
+Status: warning, but prediction remains reliable after smoothing
+
+✅ Benefits
+JavaScript-based cleaning – no external Python or R tools
+
+Ensures sensor data integrity in real time
+
+Improves model accuracy for predictive maintenance
+
+Ideal for IoT, smart factories, or remote monitoring
+
+🚀 Optional Extensions
+Add live WebSocket streaming for sensor data
+
+Integrate TensorFlow.js to train and apply failure prediction models
+
+Add rule-based thresholds per device type in MongoDB
