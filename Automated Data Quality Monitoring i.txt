@@ -1,0 +1,187 @@
+Automated Data Quality Monitoring in Cloud Data Warehouses
+(MEAN Stack – Fully JavaScript-based, no Python)
+
+🎯 Objective:
+To build an automated system that continuously monitors and validates data quality in cloud data warehouses (e.g., Snowflake, BigQuery, Redshift) by:
+
+Running scheduled or triggered data quality checks
+
+Detecting missing, null, or out-of-range values
+
+Logging schema changes or anomalies in tables
+
+Generating alerts and dashboards for visibility
+
+🌐 Use Cases:
+Data engineering teams maintaining pipelines
+
+BI teams ensuring accurate reports
+
+Cloud-native systems with dynamic schemas
+
+Compliance and audit-ready data processes
+
+🧱 Tech Stack
+Layer	Tool / Library			Purpose
+Frontend	Angular			UI to display quality metrics, logs, and alerts
+Backend	Node.js + Express		Runs validation jobs, interfaces with data warehouse
+Database	MongoDB			Logs quality check results, schema history, metrics
+Libs/APIs	JDBC drivers or REST APIs to Snowflake/BigQuery, cron, lodash, ajv	Schedule jobs, validate schema and values
+
+Note: Direct access to cloud warehouse can be simulated using mock APIs or CSVs if needed.
+
+⚙️ Key Features
+Scheduled Data Quality Checks
+
+Check nulls, duplicates, outliers, data freshness
+
+Triggered via cron or on demand
+
+Schema Drift Detection
+
+Compare current vs previous schema for changes
+
+Automated Alerting
+
+Log and notify if data anomalies or errors detected
+
+Visualization Dashboard
+
+Show record count trends, failed checks, and overall health
+
+🗃️ MongoDB Schema Example (models/DataCheckLog.js)
+js
+Copy
+Edit
+const mongoose = require('mongoose');
+
+const checkLogSchema = new mongoose.Schema({
+  table: String,
+  runAt: Date,
+  status: String, // 'success' | 'warning' | 'failed'
+  issues: [String],
+  recordCount: Number,
+  nullChecks: Object,
+  duplicatesFound: Number
+});
+
+module.exports = mongoose.model('DataCheckLog', checkLogSchema);
+🧠 Backend Logic
+Sample Validation Logic (utils/validateData.js)
+js
+Copy
+Edit
+const _ = require('lodash');
+
+function validateTableData(data) {
+  const nullChecks = {};
+  const issues = [];
+
+  const columns = Object.keys(data[0]);
+  for (const col of columns) {
+    const nullCount = data.filter(row => row[col] === null || row[col] === '').length;
+    nullChecks[col] = nullCount;
+
+    if (nullCount / data.length > 0.1) {
+      issues.push(`High null rate in column '${col}'`);
+    }
+  }
+
+  const uniqueRows = _.uniqWith(data, _.isEqual);
+  const duplicates = data.length - uniqueRows.length;
+
+  return {
+    status: issues.length > 0 || duplicates > 0 ? 'warning' : 'success',
+    nullChecks,
+    duplicatesFound: duplicates,
+    issues
+  };
+}
+
+module.exports = validateTableData;
+🔄 Scheduled Job (via cron)
+jobs/scheduleChecks.js
+js
+Copy
+Edit
+const cron = require('node-cron');
+const validateData = require('../utils/validateData');
+const DataCheckLog = require('../models/DataCheckLog');
+
+const mockTable = require('../mock/mockTable.json'); // Simulate warehouse data
+
+cron.schedule('0 * * * *', async () => { // Every hour
+  const result = validateData(mockTable);
+
+  const log = new DataCheckLog({
+    table: 'mock_sales_data',
+    runAt: new Date(),
+    status: result.status,
+    issues: result.issues,
+    nullChecks: result.nullChecks,
+    duplicatesFound: result.duplicatesFound,
+    recordCount: mockTable.length
+  });
+
+  await log.save();
+  console.log(`[Check Completed] ${result.status} – ${log.runAt}`);
+});
+🖥️ Angular Dashboard UI
+Components:
+CheckLogListComponent: View recent validation results
+
+SchemaChangeComponent: Compare schemas
+
+QualitySummaryComponent: Pie chart of failed/success checks
+
+Sample View (HTML)
+html
+Copy
+Edit
+<div *ngFor="let log of dataLogs">
+  <h3>{{ log.table }} – {{ log.runAt | date:'short' }}</h3>
+  <p>Status: <span [class]="log.status">{{ log.status }}</span></p>
+  <ul>
+    <li *ngFor="let issue of log.issues">{{ issue }}</li>
+  </ul>
+</div>
+🧪 Sample Output
+Input (mock table):
+
+json
+Copy
+Edit
+[
+  { "order_id": 1, "amount": 200, "customer": "Alice" },
+  { "order_id": 2, "amount": "", "customer": "Bob" },
+  { "order_id": 3, "amount": 200, "customer": "Alice" }
+]
+Validation Result:
+
+json
+Copy
+Edit
+{
+  "status": "warning",
+  "nullChecks": { "amount": 1 },
+  "duplicatesFound": 1,
+  "issues": ["High null rate in column 'amount'"]
+}
+✅ Benefits
+Ensures trustworthy cloud data
+
+Helps avoid data quality issues in reports/AI models
+
+Detects problems before users do
+
+Fully JavaScript-based, deployable in any Node environment
+
+🔧 Optional Enhancements
+Add email/slack alerts for failed checks
+
+Use data warehouse APIs (Snowflake, Redshift, etc.) instead of mocks
+
+Track schema evolution visually
+
+Add real-time anomaly detection (spikes, drop-offs) using streaming logic
+

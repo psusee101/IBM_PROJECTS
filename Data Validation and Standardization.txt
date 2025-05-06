@@ -1,0 +1,205 @@
+Data Validation and Standardization in Supply Chain Management
+(MEAN Stack – JavaScript-based, no Python)
+
+🎯 Objective:
+To build a system that automates the validation and standardization of supply chain data, ensuring consistency across:
+
+Product catalogs
+
+Vendor information
+
+Shipment records
+
+Inventory and logistics data
+
+This ensures data accuracy for downstream analytics, order processing, and ERP integrations.
+
+🌐 Use Cases:
+Ensuring consistent product codes across suppliers
+
+Validating delivery status or formats from logistics APIs
+
+Cleaning SKU descriptions or price fields
+
+Enforcing rules like “quantity > 0” or “valid country codes”
+
+🧱 Tech Stack
+Layer	Tool / Library	Purpose
+Frontend	Angular	UI to upload/view validated data and fix issues
+Backend	Node.js + Express	Apply validation and standardization rules
+Database	MongoDB	Store raw, validated, and corrected entries
+Libraries	ajv (for JSON schema validation), lodash, validator	Data validation & transformation logic
+
+⚙️ Key Features
+Data Validation
+
+Check for required fields, formats, value ranges
+
+Enforce supply chain-specific rules (e.g., valid location codes)
+
+Data Standardization
+
+Normalize units, country names, and currency formats
+
+Standardize SKU names, product descriptions, etc.
+
+Audit Logging
+
+Record all validations, corrections, and who did them
+
+Correction Dashboard
+
+Let users view and fix flagged records manually
+
+🗃️ MongoDB Schema (models/SupplyEntry.js)
+js
+Copy
+Edit
+const mongoose = require('mongoose');
+
+const supplySchema = new mongoose.Schema({
+  rawData: Object,
+  standardizedData: Object,
+  validationErrors: [String],
+  isValid: Boolean,
+  createdAt: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model('SupplyEntry', supplySchema);
+🧠 Validation & Standardization Logic
+utils/validateSupplyData.js
+js
+Copy
+Edit
+const _ = require('lodash');
+const validator = require('validator');
+
+function standardizeName(name) {
+  return _.startCase(_.toLower(name.trim()));
+}
+
+function validateAndStandardize(data) {
+  const errors = [];
+
+  // Required fields
+  if (!data.productCode || typeof data.productCode !== 'string') {
+    errors.push("Missing or invalid productCode");
+  }
+
+  // Price format
+  if (!validator.isDecimal(data.price?.toString())) {
+    errors.push("Invalid price format");
+  }
+
+  // Quantity check
+  if (data.quantity < 0) {
+    errors.push("Quantity cannot be negative");
+  }
+
+  // Standardize names and descriptions
+  const standardized = {
+    ...data,
+    productName: standardizeName(data.productName || ''),
+    supplier: standardizeName(data.supplier || ''),
+    country: standardizeName(data.country || '')
+  };
+
+  return {
+    standardizedData: standardized,
+    isValid: errors.length === 0,
+    validationErrors: errors
+  };
+}
+
+module.exports = validateAndStandardize;
+🔌 API Endpoint (routes/supply.js)
+js
+Copy
+Edit
+const express = require('express');
+const router = express.Router();
+const SupplyEntry = require('../models/SupplyEntry');
+const validateAndStandardize = require('../utils/validateSupplyData');
+
+router.post('/validate', async (req, res) => {
+  const { rawData } = req.body;
+  const result = validateAndStandardize(rawData);
+
+  const entry = new SupplyEntry({
+    rawData,
+    standardizedData: result.standardizedData,
+    validationErrors: result.validationErrors,
+    isValid: result.isValid
+  });
+
+  await entry.save();
+  res.json(entry);
+});
+🖥️ Angular Dashboard
+Components:
+SupplyUploadComponent: Upload JSON or CSV entries
+
+ValidationResultsComponent: View valid/invalid records
+
+CorrectionFormComponent: Edit invalid fields manually
+
+Sample View:
+html
+Copy
+Edit
+<div *ngFor="let entry of supplyEntries">
+  <h4>{{ entry.standardizedData.productName }}</h4>
+  <p>Status: {{ entry.isValid ? '✅ Valid' : '❌ Invalid' }}</p>
+  <ul *ngIf="!entry.isValid">
+    <li *ngFor="let error of entry.validationErrors">{{ error }}</li>
+  </ul>
+</div>
+🧪 Sample Input
+Raw JSON Input:
+
+json
+Copy
+Edit
+{
+  "productCode": "xYZ123 ",
+  "productName": "  INDUSTRIAL bolt ",
+  "supplier": "   acme corp ",
+  "price": "10.5",
+  "quantity": -3,
+  "country": "usA"
+}
+Validated Output:
+
+json
+Copy
+Edit
+{
+  "standardizedData": {
+    "productCode": "xYZ123 ",
+    "productName": "Industrial Bolt",
+    "supplier": "Acme Corp",
+    "price": "10.5",
+    "quantity": -3,
+    "country": "Usa"
+  },
+  "isValid": false,
+  "validationErrors": ["Quantity cannot be negative"]
+}
+✅ Benefits
+Prevents bad data from entering ERP or BI tools
+
+Reduces manual cleaning effort
+
+Standardizes naming, structure, and formats
+
+Full transparency of errors and fixes
+
+🔧 Optional Enhancements
+Add bulk CSV uploads
+
+Use Angular reactive forms for inline correction
+
+Integrate with external APIs (e.g., supplier directory)
+
+Export standardized entries to Excel or JSON for reporting
+

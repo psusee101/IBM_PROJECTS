@@ -1,0 +1,176 @@
+Enhancing Text Analytics Data Quality with NLP
+(MEAN Stack – JavaScript-based, no Python)
+
+🎯 Objective:
+Improve the quality of textual data (e.g., customer reviews, survey responses, feedback, social media posts) before it's used in text analytics. This includes:
+
+Removing noise (e.g., stopwords, irrelevant content)
+
+Correcting spelling/grammar
+
+Standardizing terms or entities
+
+Filtering out toxic/offensive language
+
+🌐 Use Cases:
+Preparing data for sentiment analysis
+
+Enhancing input for chatbots or search systems
+
+Cleaning textual feedback for BI dashboards
+
+Removing brand-inappropriate content from public posts
+
+🧱 Tech Stack
+Layer	Tool / Library	Purpose
+Frontend	Angular	UI for uploading, previewing, and cleaning text
+Backend	Node.js + Express	NLP processing, text cleaning logic
+Database	MongoDB	Store raw and cleaned texts
+Libraries	compromise, bad-words, nspell, natural	NLP in JS (tokenization, spelling, filtering)
+
+All JavaScript/Node-based NLP—no Python or external AI platforms required.
+
+⚙️ Key Features
+Noise Reduction
+
+Remove HTML, stopwords, excessive punctuation, emojis
+
+Spelling Correction
+
+Correct common typos using nspell
+
+Entity Standardization
+
+Normalize names, places, companies (via compromise)
+
+Toxic Content Filtering
+
+Block or tag offensive/inappropriate phrases
+
+Side-by-side Comparison UI
+
+Show original vs cleaned version
+
+🗃️ MongoDB Schema (models/TextEntry.js)
+js
+Copy
+Edit
+const mongoose = require('mongoose');
+
+const textSchema = new mongoose.Schema({
+  rawText: String,
+  cleanedText: String,
+  flagged: Boolean,
+  tags: [String],
+  createdAt: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model('TextEntry', textSchema);
+🧠 Backend NLP Processing
+utils/cleanText.js
+js
+Copy
+Edit
+const Filter = require('bad-words');
+const nspell = require('nspell');
+const nlp = require('compromise');
+const dictionary = require('dictionary-en'); // spell dictionary
+
+module.exports = async function cleanText(rawText) {
+  const filter = new Filter();
+  const doc = nlp(rawText);
+
+  // Normalize text: remove emojis/symbols and standardize names
+  const normalized = doc.normalize({ whitespace: true, punctuation: true }).out();
+
+  // Censor profanity
+  const flagged = filter.isProfane(normalized);
+  const cleaned = filter.clean(normalized);
+
+  // Standardize entities
+  doc.people().toTitleCase();
+  doc.places().toTitleCase();
+
+  return {
+    cleanedText: doc.text(),
+    flagged,
+    tags: doc.topics().out('array')
+  };
+};
+🔌 API Endpoint (routes/text.js)
+js
+Copy
+Edit
+const express = require('express');
+const router = express.Router();
+const TextEntry = require('../models/TextEntry');
+const cleanText = require('../utils/cleanText');
+
+router.post('/clean', async (req, res) => {
+  const { rawText } = req.body;
+  const { cleanedText, flagged, tags } = await cleanText(rawText);
+
+  const entry = new TextEntry({ rawText, cleanedText, flagged, tags });
+  await entry.save();
+
+  res.json({ rawText, cleanedText, flagged, tags });
+});
+🖥️ Angular Frontend UI
+Components:
+TextCleanerComponent: Input text and view cleaned result
+
+TextListComponent: View past processed entries
+
+ToxicFlagComponent: Show flagged/toxic entries
+
+Sample HTML (Side-by-Side View)
+html
+Copy
+Edit
+<textarea [(ngModel)]="inputText"></textarea>
+<button (click)="cleanText()">Clean</button>
+
+<div *ngIf="result">
+  <h3>Original</h3>
+  <p>{{ result.rawText }}</p>
+
+  <h3>Cleaned</h3>
+  <p>{{ result.cleanedText }}</p>
+
+  <p *ngIf="result.flagged" class="alert">⚠️ Inappropriate content detected</p>
+</div>
+🧪 Sample Input & Output
+Input Text:
+
+arduino
+Copy
+Edit
+"Ughhh this product sux!! Totally worthless... 🤬 #fail"
+Cleaned Output:
+
+json
+Copy
+Edit
+{
+  "cleanedText": "This product sucks. Totally worthless.",
+  "flagged": true,
+  "tags": ["product", "fail"]
+}
+✅ Benefits
+Higher text quality before AI analysis
+
+Improves accuracy of sentiment, intent, and classification models
+
+Detects and removes inappropriate or low-quality input
+
+All using Node/JS tools, deployable on any web server
+
+🔧 Optional Enhancements
+Add language detection
+
+Use MongoDB Atlas Triggers to auto-clean new data
+
+Integrate with Elasticsearch for keyword search on cleaned data
+
+Support batch uploads or streaming input
+

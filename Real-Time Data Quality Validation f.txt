@@ -1,0 +1,175 @@
+ Real-Time Data Quality Validation for Streaming Data
+(MEAN Stack – Node.js + MongoDB + Angular, no Python)
+
+🎯 **Objective:
+Build a system to validate the quality of streaming data in real time.**
+This project ensures that incoming data from sources like IoT devices, APIs, or logs is:
+
+Clean (no missing or malformed fields)
+
+Accurate (values within acceptable range or format)
+
+Consistent (matches historical or expected patterns)
+
+📦 Use Cases
+Sensor data monitoring (IoT)
+
+Stock market feeds
+
+Social media or log stream quality control
+
+API ingestion pipelines
+
+🧱 Tech Stack Overview
+Layer	Tool / Library			Purpose
+Frontend	Angular			UI to monitor incoming data & validation results
+Backend	Node.js + Express + WebSocket	Real-time stream handling & validation
+Database	MongoDB			Store raw data and validation logs
+Libraries	ajv, validator, lodash	Schema validation, string/number format checks
+
+⚙️ Key Features
+Real-Time Stream Ingestion
+Data pushed via WebSocket or REST API
+
+Validation Rules
+
+Required fields
+
+Data type checks
+
+Value range limits
+
+Timestamp freshness
+
+Anomaly Detection (Lightweight)
+Flag spikes or out-of-pattern values
+
+Live Monitoring Dashboard
+
+Good vs bad record count
+
+Last N errors
+
+Stream health status
+
+🗃️ MongoDB Schema (models/StreamData.js)
+js
+Copy
+Edit
+const mongoose = require('mongoose');
+
+const streamDataSchema = new mongoose.Schema({
+  data: Object,
+  isValid: Boolean,
+  errors: [String],
+  receivedAt: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model('StreamData', streamDataSchema);
+🧠 Backend – Validation Logic
+utils/validateData.js
+js
+Copy
+Edit
+const Ajv = require('ajv');
+const validator = require('validator');
+
+const ajv = new Ajv();
+const schema = {
+  type: 'object',
+  required: ['deviceId', 'temperature', 'timestamp'],
+  properties: {
+    deviceId: { type: 'string' },
+    temperature: { type: 'number', minimum: -50, maximum: 150 },
+    humidity: { type: 'number' },
+    timestamp: { type: 'string', format: 'date-time' }
+  }
+};
+
+const validate = ajv.compile(schema);
+
+function validateStreamData(data) {
+  const isValid = validate(data);
+  const errors = validate.errors?.map(e => `${e.instancePath} ${e.message}`) || [];
+  return { isValid, errors };
+}
+
+module.exports = validateStreamData;
+🔌 API/WebSocket Integration
+WebSocket Handler (Node.js server)
+js
+Copy
+Edit
+const WebSocket = require('ws');
+const StreamData = require('./models/StreamData');
+const validateStreamData = require('./utils/validateData');
+
+const wss = new WebSocket.Server({ port: 8081 });
+
+wss.on('connection', ws => {
+  ws.on('message', async msg => {
+    const data = JSON.parse(msg);
+    const { isValid, errors } = validateStreamData(data);
+    const record = new StreamData({ data, isValid, errors });
+    await record.save();
+
+    ws.send(JSON.stringify({ status: isValid ? 'valid' : 'invalid', errors }));
+  });
+});
+🖥️ Angular Frontend Dashboard
+Components
+LiveStreamComponent: View incoming data records in real-time
+
+ErrorLogComponent: Shows recent invalid records and error types
+
+SummaryStatsComponent: Aggregates stats (valid %, error types, etc.)
+
+Example HTML (Live View)
+html
+Copy
+Edit
+<div *ngFor="let record of streamData">
+  <p>Device: {{ record.data.deviceId }} | Temp: {{ record.data.temperature }}</p>
+  <p>Status: <span [class.valid]="record.isValid">{{ record.isValid ? '✔' : '❌' }}</span></p>
+  <ul *ngIf="!record.isValid">
+    <li *ngFor="let e of record.errors">{{ e }}</li>
+  </ul>
+</div>
+🔍 Sample Incoming Record
+Input (WebSocket or REST):
+
+json
+Copy
+Edit
+{
+  "deviceId": "sensor-001",
+  "temperature": 160,
+  "humidity": 45,
+  "timestamp": "2025-05-06T12:00:00Z"
+}
+Validation Result:
+
+json
+Copy
+Edit
+{
+  "status": "invalid",
+  "errors": ["temperature must be <= 150"]
+}
+✅ Benefits
+Detects malformed or suspicious data instantly
+
+Improves downstream AI/data analytics accuracy
+
+100% JavaScript-only, no external ML/AI dependencies
+
+Suitable for IoT, analytics, or enterprise data pipelines
+
+🔧 Optional Enhancements
+Integrate message queues (Kafka, MQTT)
+
+Add email/SMS alert for threshold breaches
+
+Show live charts for temperature/humidity trends
+
+Plug into TensorFlow.js for predictive validation
